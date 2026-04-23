@@ -2,44 +2,57 @@
 
 Docker Compose configuration for the [Fing Agent](https://hub.docker.com/r/fing/fing-agent) network monitoring service, integrated with the [Fing Local API](https://www.fing.com/integrations/local-api/) and Home Assistant.
 
-The physical **Fingbox** device is at `192.168.0.144` and already exposes the Local API on port `49090`. This repository also deploys a software-based **Fing Agent** container for additional monitoring from the Docker host.
+The software **Fing Agent** runs on the **QNAP TS-264 NAS** (`CALGARYHOUSE`, `192.168.0.150`) via Container Station. The physical **Fingbox v1** is at `192.168.0.144` and independently exposes the same Local API on port `49090`.
 
 ---
 
 ## Prerequisites
 
-- Docker Desktop installed and running on Windows.
+- QNAP Container Station installed on the NAS (available from QNAP App Center).
 - The [Fing mobile app](https://www.fing.com/) (iOS / Android) logged in to your Fing account — required for agent activation and API key retrieval.
-- A Fing Starter or Premium subscription (one agent included with Starter).
+- A Fing Starter or Premium subscription.
 
 ---
 
-## Quick start
+## QNAP Container Station setup
 
-### 1. Clone and configure
+### 1. Copy the project to the NAS
 
-```powershell
-git clone https://github.com/FamilyPotter/fingbox-familypotter.git
-cd fingbox-familypotter
-Copy-Item .env.example .env
+Either clone via SSH or upload the files using QNAP File Station to a shared folder, e.g. `/share/fingbox-familypotter/`.
+
+```bash
+# Via SSH on the QNAP
+git clone https://github.com/FamilyPotter/fingbox-familypotter.git /share/fingbox-familypotter
 ```
 
-Edit `.env` and fill in your values (see [Obtaining the API key](#obtaining-the-api-key) below).
+### 2. Create the data directory
 
-### 2. Start the Fing Agent
+```bash
+mkdir -p /share/fing-data
+```
 
-```powershell
+### 3. Deploy with Container Station
+
+In the QNAP web UI:
+
+1. Open **Container Station**.
+2. Go to **Applications** and click **+ Create**.
+3. Select **Upload a Compose file** and upload `docker-compose.yml`, or paste its contents directly.
+4. Click **Create** — Container Station will pull `fing/fing-agent:latest` and start the container.
+
+Alternatively, deploy via SSH:
+
+```bash
+cd /share/fingbox-familypotter
 docker compose up -d
 ```
 
-The container runs with `network_mode: host` and `NET_ADMIN` capability so it can ARP-scan the LAN. The Local API is then available at `http://localhost:49090`.
+### 4. Activate via the Fing app
 
-### 3. Activate via the Fing app
-
-On first run the container registers as an unactivated agent:
+On first run the agent registers as unactivated:
 
 1. Open the Fing app and go to **Network > Agents**.
-2. Tap the new agent that appears (it will show as pending activation).
+2. Tap the new agent that appears (shown as pending activation).
 3. Follow the in-app prompts to activate it.
 4. Once active, retrieve the API key (see below).
 
@@ -47,12 +60,12 @@ On first run the container registers as an unactivated agent:
 
 ## Obtaining the API key
 
-The API key is generated on the agent and surfaced through the Fing mobile app:
+The API key is generated on the agent and surfaced through the Fing mobile app.
 
-**For the Docker-based Fing Agent:**
+**For the QNAP-based Fing Agent:**
 
 1. In the Fing app, navigate to **Network > Agents**.
-2. Tap your running agent (the one on this Docker host).
+2. Tap the QNAP agent.
 3. Tap **Settings > Local API**.
 4. Copy the displayed API key into your `.env` file as `FING_API_KEY`.
 
@@ -60,7 +73,8 @@ The API key is generated on the agent and surfaced through the Fing mobile app:
 
 1. In the Fing app, tap the **Fingbox** device listed under your network.
 2. Tap **Settings > Local API**.
-3. Copy the API key — it may be the same key or a separate one depending on your Fing account.
+
+Current API key: stored in `.env` (gitignored).
 
 Keep the API key confidential — it grants read access to your live network device data.
 
@@ -68,13 +82,13 @@ Keep the API key confidential — it grants read access to your live network dev
 
 ## Local API reference (v1.1.0)
 
-The Fing Local API is a free, locally-published HTTP API. All endpoints require the API key as a `auth` query parameter.
+All endpoints require the API key as the `auth` query parameter.
 
 ### Base URLs
 
 | Agent | URL |
 |-------|-----|
-| Fing Agent (Docker host) | `http://localhost:49090/1/` |
+| Fing Agent (QNAP NAS) | `http://192.168.0.150:49090/1/` |
 | Fingbox (physical) | `http://192.168.0.144:49090/1/` |
 
 ### `GET /devices`
@@ -89,19 +103,18 @@ GET http://<host>:49090/1/devices?auth=<api_key>
 
 ```json
 {
-  "networkId": "wifi-12345812839223",
+  "networkId": "eth-C0A80000-1890210663F619",
   "devices": [
     {
       "mac":          "00:11:22:33:44:55",
       "ip":           ["192.168.0.1"],
       "state":        "UP",
-      "name":         "Bedroom Chromecast",
-      "type":         "STREAMING_DONGLE",
-      "make":         "Google",
-      "model":        "Chromecast",
-      "contactId":    "67363e09-5ad6-40d0-883f-3e17254eec7a",
+      "name":         "Main Sky Hub",
+      "type":         "ROUTER",
+      "make":         "Sky",
+      "model":        "Sky Hub",
       "first_seen":   "2020-04-24T12:54:21.634Z",
-      "last_changed": "2020-06-11T12:01:23.164Z"
+      "last_changed": "2026-04-23T11:00:00.000Z"
     }
   ]
 }
@@ -115,7 +128,7 @@ Device fields:
 | `ip` | string[] | One or more IP addresses |
 | `state` | string | `UP` or `DOWN` |
 | `name` | string | Human-readable device name |
-| `type` | string | Device category (e.g. `STREAMING_DONGLE`) |
+| `type` | string | Device category |
 | `make` | string | Manufacturer |
 | `model` | string | Model name |
 | `contactId` | uuid | Reference to the Fing contact that owns this device |
@@ -132,53 +145,66 @@ Device fields:
 
 ### `GET /people` — Fing Desktop only
 
-> **Not supported** by Fing Agent (Docker) or Fingbox. Calls to this endpoint will return a 503 service error on those agents.
+> **Not supported** by Fing Agent (Docker) or Fingbox. Returns a 503 error on those agents.
 
-### Quick test (PowerShell)
+### Quick test
 
 ```powershell
-# Load the key from .env
-$key = (Get-Content .env | Where-Object { $_ -match "^FING_API_KEY=" }) -replace "^FING_API_KEY=",""
+# From PROMAX Windows PC — query the Fingbox (always available)
+Invoke-RestMethod "http://192.168.0.144:49090/1/devices?auth=<api_key>"
 
-# Query the Docker agent
-Invoke-RestMethod "http://localhost:49090/1/devices?auth=$key"
-
-# Query the physical Fingbox
-Invoke-RestMethod "http://192.168.0.144:49090/1/devices?auth=$key"
+# Query the QNAP Fing Agent (once activated)
+Invoke-RestMethod "http://192.168.0.150:49090/1/devices?auth=<api_key>"
 ```
 
 ---
 
 ## Home Assistant integration
 
-The Fing integration (introduced in **Home Assistant 2025.11**) provides device tracker entities for each discovered network device, enabling presence detection automations.
+The Fing integration (introduced in **Home Assistant 2025.11**) provides device tracker entities for presence detection automations.
 
 ### Setup
 
-1. In Home Assistant, go to **Settings > Devices & Services**.
-2. Click **Add Integration** and search for **Fing**.
-3. Enter the connection details:
+In Home Assistant, go to **Settings > Devices & Services > Add Integration > Fing** and enter:
 
-| Field | Docker Agent | Physical Fingbox |
-|-------|-------------|-----------------|
-| Host | Docker host LAN IP | `192.168.0.144` |
+| Field | Fingbox (physical) | Fing Agent (QNAP) |
+|-------|-------------------|-------------------|
+| Host | `192.168.0.144` | `192.168.0.150` |
 | Port | `49090` | `49090` |
-| API Key | From `.env` | From Fing app |
+| API Key | from Fing app | from Fing app |
 
-4. Home Assistant will create a **device tracker** entity for each device Fing has discovered.
+Point HA at the **Fingbox** (`192.168.0.144`) for immediate use — it is already active and returning 67 devices.
 
 ### What you get
 
-- `device_tracker.<device_name>` entities with state `home` / `not_home` based on `UP`/`DOWN` status.
-- Attributes on each entity: MAC address, IP addresses, device type, make, model, `first_seen`, `last_changed`.
-- Usable in **automations** and **presence detection** (e.g. notify when an unknown device joins the network, or trigger scenes when a family member's phone comes online).
+- `device_tracker.<device_name>` entities — state `home` / `not_home` based on UP/DOWN status.
+- Attributes: MAC, IP, device type, make/model, `first_seen`, `last_changed`.
+- Usable in automations, presence detection, and dashboards.
 
 ### Troubleshooting
 
-- Confirm the Fing Agent container is running: `docker compose ps`
-- Verify the Local API is reachable: `Invoke-RestMethod "http://localhost:49090/1/devices?auth=<key>"`
-- Ensure the Local API version is 1.1.0 or newer (check the Fing app under agent settings).
-- Check that the port and IP entered in Home Assistant match the actual agent.
+- Confirm the container is running: `docker compose ps` (via QNAP SSH or Container Station UI)
+- Test the Local API: `curl "http://192.168.0.150:49090/1/devices?auth=<key>"`
+- Ensure Local API version is 1.1.0+.
+
+---
+
+## Network devices (67 discovered by Fingbox)
+
+Key devices visible on the FamilyPotter network:
+
+| Device | IP | MAC | Status |
+|--------|----|-----|--------|
+| Fingbox v1 | 192.168.0.144 | F0:23:B9:EB:12:F9 | UP |
+| QNAP NAS (CALGARYHOUSE) | 192.168.0.150/151 | 24:5E:BE:6D:25:88/89 | UP |
+| PROMAX (Windows PC) | 192.168.0.68 | E8:CF:83:8E:0B:69 | UP |
+| Main Sky Hub | 192.168.0.1 | 90:21:06:63:F6:19 | UP |
+| Hikvision NVR | 192.168.0.15 | 28:57:BE:86:BF:00 | UP |
+| 6× Hikvision cameras | .30/.31/.32/.33/.35/.36 | various | UP/DOWN |
+| 5× Sonos devices | .67/.80/.94/.95/.97/.98 | various | UP |
+| Sky Q boxes | .51/.73/.91/.197 | various | UP/DOWN |
+| Miele dishwasher | 192.168.0.66 | 00:1D:63:75:0A:43 | UP |
+| Miele washing machine | 192.168.0.69 | 00:1D:63:CB:7C:76 | UP |
 
 ---
 
@@ -186,7 +212,7 @@ The Fing integration (introduced in **Home Assistant 2025.11**) provides device 
 
 ```
 fingbox-familypotter/
-├── docker-compose.yml   # Fing Agent service definition
+├── docker-compose.yml   # Fing Agent — deploy on QNAP Container Station
 ├── .env.example         # Environment variable template
 ├── .env                 # Your real values (gitignored)
 ├── .gitignore
@@ -200,4 +226,4 @@ fingbox-familypotter/
 - [Fing Agent on Docker Hub](https://hub.docker.com/r/fing/fing-agent)
 - [Fing Local API documentation](https://www.fing.com/integrations/local-api/)
 - [Home Assistant Fing integration](https://www.home-assistant.io/integrations/fing)
-- [Fing Help Center — Installing Fing Agent](https://help.fing.com/hc/en-us/articles/14429872073244)
+- [QNAP Container Station documentation](https://www.qnap.com/en/software/container-station)
