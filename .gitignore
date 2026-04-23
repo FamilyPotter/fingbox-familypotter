@@ -1,0 +1,10 @@
+# Real secrets — never commit
+.env
+
+# Docker named volumes and local data
+fing-data/
+
+# OS artefacts
+.DS_Store
+Thumbs.db
+desktop.ini

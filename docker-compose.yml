@@ -1,0 +1,16 @@
+services:
+  fing-agent-familypotter:
+    image: fing/fing-agent:latest
+    container_name: fing-agent-familypotter
+    # HOST networking is required so the agent can ARP-scan the LAN.
+    # Ports 44444 (Fing cloud sync) and 49090 (Local API) are
+    # automatically reachable on the host — no ports: mapping needed.
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - fing-data:/app/fingdata
+    restart: always
+
+volumes:
+  fing-data:
