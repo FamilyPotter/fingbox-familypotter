@@ -2,7 +2,7 @@
 
 Docker Compose configuration for the [Fing Agent](https://hub.docker.com/r/fing/fing-agent) network monitoring service, integrated with the [Fing Local API](https://www.fing.com/integrations/local-api/) and Home Assistant.
 
-The physical **Fingbox** device is at `192.168.0.68` and already exposes the Local API on port `49090`. This repository also deploys a software-based **Fing Agent** container for additional monitoring from the Docker host.
+The physical **Fingbox** device is at `192.168.0.144` and already exposes the Local API on port `49090`. This repository also deploys a software-based **Fing Agent** container for additional monitoring from the Docker host.
 
 ---
 
@@ -56,7 +56,7 @@ The API key is generated on the agent and surfaced through the Fing mobile app:
 3. Tap **Settings > Local API**.
 4. Copy the displayed API key into your `.env` file as `FING_API_KEY`.
 
-**For the physical Fingbox at `192.168.0.68`:**
+**For the physical Fingbox at `192.168.0.144`:**
 
 1. In the Fing app, tap the **Fingbox** device listed under your network.
 2. Tap **Settings > Local API**.
@@ -75,7 +75,7 @@ The Fing Local API is a free, locally-published HTTP API. All endpoints require 
 | Agent | URL |
 |-------|-----|
 | Fing Agent (Docker host) | `http://localhost:49090/1/` |
-| Fingbox (physical) | `http://192.168.0.68:49090/1/` |
+| Fingbox (physical) | `http://192.168.0.144:49090/1/` |
 
 ### `GET /devices`
 
@@ -144,7 +144,7 @@ $key = (Get-Content .env | Where-Object { $_ -match "^FING_API_KEY=" }) -replace
 Invoke-RestMethod "http://localhost:49090/1/devices?auth=$key"
 
 # Query the physical Fingbox
-Invoke-RestMethod "http://192.168.0.68:49090/1/devices?auth=$key"
+Invoke-RestMethod "http://192.168.0.144:49090/1/devices?auth=$key"
 ```
 
 ---
@@ -161,7 +161,7 @@ The Fing integration (introduced in **Home Assistant 2025.11**) provides device 
 
 | Field | Docker Agent | Physical Fingbox |
 |-------|-------------|-----------------|
-| Host | Docker host LAN IP | `192.168.0.68` |
+| Host | Docker host LAN IP | `192.168.0.144` |
 | Port | `49090` | `49090` |
 | API Key | From `.env` | From Fing app |
 
